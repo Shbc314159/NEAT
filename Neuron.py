@@ -4,7 +4,7 @@ class Neuron():
     def __init__(self, id, input_neuron, output_neuron):
         self.id = id
         self.input_neuron = input_neuron
-        self.output_neuron = output_neuron
+        self.output_neuron = output_neuron 
         self.sum = 0
         self.value = None
          

@@ -54,7 +54,7 @@ class Species():
         self.current_members.append(new_network)
 
     def sort_species(self):
-        self.current_members.sort(key=lambda obj: obj.fitness) 
+        self.current_members.sort(key=lambda obj: obj.fitness)  
 
     def remove_worst(self, number_of_members):
         self.sort_species()
