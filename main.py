@@ -41,7 +41,7 @@ def main():
         print("Best fitness: ", best.fitness)
         if best.fitness < 2.0:
             best_inputs = [0.0, 0.0]
-            output = best.run(best_inputs)[0]
+            output = best.run(best_inputs)[0] 
             print(output)
             best_output = expected_output(best_inputs)
             print(abs(output - best_output))

@@ -52,7 +52,7 @@ class Genetic_Algorithm:
 
         for species in self.species_list:
             species.total_fitness = 0.0
-            for network in species.current_members:
+            for network in species.current_members: 
                 network.fitness *= len(species.current_members)
                 total_fitness += network.fitness
                 species.total_fitness += network.fitness

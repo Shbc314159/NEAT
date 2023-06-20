@@ -5,7 +5,7 @@ import random
 import copy
 
 class Neural_Network():
-    def __init__(self, num_inputs, num_outputs):
+    def __init__(self, num_inputs, num_outputs): 
         self.num_inputs = num_inputs
         self.num_outputs = num_outputs
         self.fitness = 0

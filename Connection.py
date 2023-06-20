@@ -5,7 +5,7 @@ class Connection():
         self.input_neuron = input_neuron
         self.output_neuron = output_neuron
         self.innovation_number = innovation_number
-        self.weight = random.random() * 4 - 2
+        self.weight = random.random() * 4 - 2 
         self.active = True
     
     def print(self):

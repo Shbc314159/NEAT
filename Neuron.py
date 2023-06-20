@@ -7,7 +7,7 @@ class Neuron():
         self.output_neuron = output_neuron
         self.sum = 0
         self.value = None
-        
+         
     def activate(self):
         self.value = self.sigmoid(self.sum)
     
