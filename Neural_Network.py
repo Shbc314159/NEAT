@@ -8,7 +8,6 @@ class Neural_Network():
     def __init__(self, num_inputs, num_outputs):  
         self.num_inputs = num_inputs
         self.num_outputs = num_outputs
-        self.fitness = 0
         self.genome_neurons = []
         self.genome_connections = []
         self.input_neurons = []
@@ -34,13 +33,13 @@ class Neural_Network():
         self.input_neurons.append(neuron)     
         self.add_to_global_list(neuron)
     
-    def create_connection(self, input_id, output_id, weight=0.0, active=False, pass_weight=False, pass_activation=False):
+    def create_connection(self, input_neuron, output_neuron, weight=0.0, active=False, pass_weight=False, pass_activation=False):
         new_connection = True
         connection_in_self = False
         innovation_number = -1
         
         for connection in globalvars.connections:
-            if connection.input_neuron == input_id and connection.output_neuron == output_id:
+            if connection.input_neuron.id == input_neuron.id and connection.output_neuron.id == output_neuron.id:
                 new_connection = False
                 innovation_number = connection.innovation_number
             
@@ -48,7 +47,7 @@ class Neural_Network():
             innovation_number = globalvars.next_innovation_number
             globalvars.next_innovation_number += 1
         
-        connection = Connection(input_id, output_id, innovation_number)
+        connection = Connection(input_neuron, output_neuron, innovation_number)
         
         if pass_weight:
             connection.weight = weight
@@ -70,14 +69,16 @@ class Neural_Network():
         return connection
     
     def create_neuron(self, connection):
-        input_id = connection.input_neuron
-        output_id = connection.output_neuron
+        input_neuron = connection.input_neuron
+        output_neuron = connection.output_neuron
+        input_id = connection.input_neuron.id
+        output_id = connection.output_neuron.id
         new_neuron = True
         neuron_in_self = False
         neuron_id = -1
         
         for neuron in globalvars.neurons:
-            if neuron.input_id == input_id and neuron.output_id == output_id:
+            if neuron.input_neuron == input_id and neuron.output_neuron == output_id:
                 new_neuron = False
                 neuron_id = neuron.id
         
@@ -86,7 +87,7 @@ class Neural_Network():
             globalvars.next_id += 1
         
         connection.active == False
-        neuron = Neuron(neuron_id, input_id, output_id)
+        neuron = Neuron(neuron_id, input_neuron, output_neuron)
         
         if new_neuron:
             globalvars.neurons.append(neuron)
@@ -99,8 +100,8 @@ class Neural_Network():
             self.genome_neurons.append(neuron)
             self.hidden_neurons.append(neuron)
         
-        connection1 = self.create_connection(input_id, neuron_id, 1, True, True, False)
-        connection2 = self.create_connection(neuron_id, output_id, connection.weight, True, True, False)
+        connection1 = self.create_connection(input_neuron, neuron, 1, True, True, False)
+        connection2 = self.create_connection(neuron, output_neuron, connection.weight, True, True, False)
         
         return connection1, connection2
     
@@ -125,28 +126,26 @@ class Neural_Network():
                 active_connections.append(connection)
 
         for neuron in self.output_neurons:
-            outputs.append(self.get_neuron_value(neuron.id, active_connections, neuron_map, visited))
+            outputs.append(self.get_neuron_value(neuron, active_connections, visited))
             visited.clear()
 
         return outputs
 
-    def get_neuron_value(self, neuron_id, active_connections, neuron_map, visited):
-        neuron = neuron_map[neuron_id]
-
+    def get_neuron_value(self, neuron, active_connections, visited):
         if neuron.value != None:
             return neuron.value
 
-        if neuron_id in visited:
+        if neuron.id in visited:
             return 1
 
-        visited.add(neuron_id)
+        visited.add(neuron.id)
 
         for connection in active_connections:
-            if connection.output_neuron == neuron.id:
-                input_neuron = neuron_map[connection.input_neuron]
+            if connection.output_neuron.id == neuron.id:
+                input_neuron = connection.input_neuron
 
                 if input_neuron.value == None:
-                    neuron.sum += self.get_neuron_value(connection.input_neuron, active_connections, neuron_map, visited) * connection.weight
+                    neuron.sum += self.get_neuron_value(connection.input_neuron, active_connections, visited) * connection.weight
                 else:
                     neuron.sum += input_neuron.value * connection.weight
 
@@ -167,11 +166,10 @@ class Neural_Network():
             offspring_connection = offspring.create_connection(connection.input_neuron, connection.output_neuron, connection.weight, connection.active, True, True)
 
             if not self.has_node(offspring, offspring_connection.input_neuron):
-                id = connection.input_neuron
-                input_id, output_id = self.find_input_output_neuron(id)
-
-                neuron = Neuron(id, input_id, output_id)
+                conn_neuron = connection.input_neuron
+                neuron = Neuron(conn_neuron.id, conn_neuron.input_neuron, conn_neuron.output_neuron)
                 offspring.genome_neurons.append(neuron)
+                id = conn_neuron.id
 
                 if (id < self.num_inputs) or (id == self.num_inputs + self.num_outputs):
                     offspring.input_neurons.append(neuron)
@@ -181,11 +179,10 @@ class Neural_Network():
                     offspring.hidden_neurons.append(neuron)
 
             if not self.has_node(offspring, offspring_connection.output_neuron):
-                id = connection.output_neuron
-                input_id, output_id = self.find_input_output_neuron(id)
-
-                neuron = Neuron(id, input_id, output_id)
+                conn_neuron = connection.output_neuron
+                neuron = Neuron(conn_neuron.id, conn_neuron.input_neuron, conn_neuron.output_neuron)
                 offspring.genome_neurons.append(neuron)
+                id = conn_neuron.id
 
                 if (id < self.num_inputs) or (id == self.num_inputs + self.num_outputs):
                     offspring.input_neurons.append(neuron)
@@ -213,12 +210,8 @@ class Neural_Network():
             other_conn = next((connection for connection in other_network.genome_connections if connection.innovation_number == innovation_num), None)
             other_lined_up.append(other_conn)
         
-        if self.fitness < other_network.fitness:
-            fitter_lined_up = self_lined_up
-            worse_lined_up = other_lined_up
-        else:
-            fitter_lined_up = other_lined_up
-            worse_lined_up = self_lined_up
+        fitter_lined_up = self_lined_up
+        worse_lined_up = other_lined_up
         
         for i in range(len(fitter_lined_up)):
             fitter_item = fitter_lined_up[i]
@@ -242,13 +235,6 @@ class Neural_Network():
                 return True
 
         return False
-
-    def find_input_output_neuron(self, id):
-        for neuron in globalvars.neurons:
-            if neuron.id == id:
-                return neuron.input_id, neuron.output_id
-
-        print("\nError: Neuron not found\n")
 
     def add_to_global_list(self, neuron):
         for neuron_global in globalvars.neurons:
@@ -275,7 +261,7 @@ class Neural_Network():
         if output_neuron.id == input_neuron.id:
             print("\nError: Input and output neurons cannot be the same\n")
 
-        connection = self.create_connection(input_neuron.id, output_neuron.id)
+        connection = self.create_connection(input_neuron, output_neuron)
 
     def mutate_neuron(self):
         conn = random.choice(self.genome_connections)
@@ -289,14 +275,14 @@ class Neural_Network():
             else:
                 connection.weight *= perturbation
 
-    def mutate(self, probabilities):
-        if probabilities[0] > random.random():
+    def mutate(self):
+        if 0.05 > random.random():
             self.mutate_connection()
 
-        if probabilities[1] > random.random() and len(self.genome_connections) > 0:
+        if 0.03 > random.random() and len(self.genome_connections) > 0:
             self.mutate_neuron()
 
-        if probabilities[2] > random.random() and len(self.genome_connections) > 0:
+        if 0.8 > random.random() and len(self.genome_connections) > 0:
             self.mutate_weights()
             
     def print(self):
@@ -314,4 +300,5 @@ class Neural_Network():
         for neuron in self.output_neurons:
             neuron.print()
         print("Num inputs:", self.num_inputs, "Num outputs:", self.num_outputs, "Fitness:", self.fitness)
-      
+        
+

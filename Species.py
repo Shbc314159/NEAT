@@ -1,88 +1,134 @@
 from Neural_Network import *
+import math
+import random
 
 class Species():
-    def __init__(self, template_network, c1, c2, c3, compatibility_threshold):
-        self.lowest_fitness = 100000
-        self.last_gen_improvement = 0
+    def __init__(self, player):
+        self.best_fitness = 0.0
+        self.staleness = 0
         self.current_generation = 1
-        self.template_network = template_network
-        self.current_members = [template_network]
-        self.c1 = c1
-        self.c2 = c2
-        self.c3 = c3
-        self.compatibility_threshold = compatibility_threshold
-        self.total_fitness = 0.0
-
-    def check_network(self, new_network):
-        num_excess = 0
+        self.champ = None
+        self.players = []
+        self.c1 = 1.0
+        self.c2 = 1.0
+        self.c3 = 0.4
+        self.compatibility_threshold = 5.0
+        self.representative = None
+        
+        if player:
+            self.players.append(player)
+            self.best_fitness = player.fitness
+            self.representative = copy.deepcopy(player.brain)
+        
+    @staticmethod
+    def get_excess(network1, network2):
+        return abs(len(network1.genome_connections) - len(network2.genome_connections))
+    
+    @staticmethod
+    def get_disjoint(network1, network2):
         num_disjoint = 0
-        weight_difference_matching = 0
-        genes_in_larger = 0
-
-        if len(new_network.genome_connections) > len(self.template_network.genome_connections):
-            genes_in_larger = len(new_network.genome_connections)
+        if len(network1.genome_connections) > len(network2.genome_connections):
+            smaller_list = network2.genome_connections
+            larger_list = network1.genome_connections
         else:
-            genes_in_larger = len(self.template_network.genome_connections)
-
-        newIndex = 0
-        originalIndex = 0
-
-        while newIndex < len(new_network.genome_connections) and originalIndex < len(self.template_network.genome_connections):
-            newConn = new_network.genome_connections[newIndex]
-            originalConn = self.template_network.genome_connections[originalIndex]
-
-            if newConn.innovation_number == originalConn.innovation_number:
-                weight_difference_matching += abs(newConn.weight - originalConn.weight)
-                newIndex += 1
-                originalIndex += 1
-            elif newConn.innovation_number < originalConn.innovation_number:
+            smaller_list = network1.genome_connections
+            larger_list = network2.genome_connections
+        
+        for connection in smaller_list:
+            for other_connection in larger_list:
+                if connection.innovation_number == other_connection.innovation_number:
+                    break
                 num_disjoint += 1
-                newIndex += 1
-            else:  # newConn.innovation_number > originalConn.innovation_number
-                num_excess += 1
-                originalIndex += 1
+                
+        return num_disjoint
+    
+    @staticmethod
+    def get_weight_difference(network1, network2):
+        if not network1.genome_connections or not network2.genome_connections:
+            return 0
+        matching = 0
+        total_difference = 0
+        for connection in network1.genome_connections:
+            for other_connection in network2.genome_connections:
+                if connection.innovation_number == other_connection.innovation_number:
+                    matching += 1
+                    total_difference += abs(connection.weight - other_connection.weight)
+                    break
+        
+        return 100 if not matching else total_difference / matching
+                
 
-        num_excess += len(new_network.genome_connections) - newIndex
+    def same_species(self, new_network):
+        num_excess = self.get_excess(self.representative, new_network)
+        num_disjoint = self.get_disjoint(self.representative, new_network)
+        weight_difference_matching = self.get_weight_difference(self.representative, new_network)
+        large_genome_normalizer = max(len(new_network.genome_neurons) - 20, 1)
 
-        difference = (self.c1 * num_excess / genes_in_larger) + (self.c2 * num_disjoint / genes_in_larger) + (self.c3 * weight_difference_matching)
-        if difference < self.compatibility_threshold:
-            return True
-        else:
-            return False
+        compatibility = (self.c1 * num_excess / large_genome_normalizer) + (self.c2 * num_disjoint / large_genome_normalizer) + (self.c3 * weight_difference_matching)
+        return self.compatibility_threshold > compatibility
 
-    def add_network(self, new_network):
-        self.current_members.append(new_network)
+    def add_to_species(self, new_member):
+        self.players.append(new_member)
 
     def sort_species(self):
-        self.current_members.sort(key=lambda obj: obj.fitness)  
+        self.players.sort(key=lambda obj: obj.fitness, reverse=True)
+        if not self.players:
+            self.staleness = 200
+            return None
 
-    def remove_worst(self, number_of_members):
-        self.sort_species()
-        prev_members = len(self.current_members)
-        self.current_members = self.current_members[:-number_of_members]
-        if prev_members - number_of_members != len(self.current_members):
-            print("ERROR: Number of members minus number of members removed is not equal to number of members left")
-
-    def increment_generation(self):
-        self.sort_species()
-        for member in self.current_members:
-            if member.fitness < self.lowest_fitness:
-                self.lowest_fitness = member.fitness
-                self.last_gen_improvement = self.current_generation
-
-        if (len(self.current_members) > 0):
-            self.template_network = self.current_members[0]
-            self.current_members.clear()
-            
-        self.current_generation += 1
-
-    def kill_species(self):
-        if self.last_gen_improvement < self.current_generation - 15:
-            return True
+        if self.players[0].fitness > self.best_fitness:
+            self.staleness = 0
+            self.best_fitness = self.players[0].fitness
+            self.representative = copy.deepcopy(self.players[0].brain)
         else:
-            return False
-        
+            self.staleness += 1 
+        return None
     
+    @property
+    def average_fitness(self):
+        if not self.players:
+            return 0.0
+        return sum(player.fitness for player in self.players) / len(self.players)
+
+    def fitness_sharing(self):
+        for player in self.players:
+            player.fitness /= len(self.players)
+        
+    def select_player(self):
+        if len(self.players) == 0:
+            raise RuntimeError("No players")
+        fitness_sum = math.floor(sum(player.fitness for player in self.players))
+        rand = 0
+        if fitness_sum > 0:
+            rand = random.randrange(fitness_sum)
+        running_sum = 0.0
+        for player in self.players:
+            running_sum += player.fitness
+            if running_sum > rand:
+                return player
+        return self.players[0]
+    
+    def get_offspring(self):
+        if random.random() < 0.25:
+            offspring = copy.deepcopy(self.select_player())
+        else:
+            parent1 = self.select_player()
+            parent2 = self.select_player()
+            
+            if parent1.fitness < parent2.fitness:
+                parent1, parent2 = parent2, parent1
+            offspring = parent1.crossover(parent2)
+        offspring.brain.mutate()
+        
+        return offspring
+
+    def cull(self):
+        if len(self.players) > 2:
+            self.players = self.players[int(len(self.players) / 2) :]
+        
+        
+        
+"""   
 inputs = [0.5, 0.5]
  
 network = Neural_Network(2, 1)
@@ -109,3 +155,4 @@ for i in range(15):
     network.mutate_connection()
     network.mutate_neuron()
     network.mutate_neuron()
+"""
